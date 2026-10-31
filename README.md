@@ -43,9 +43,15 @@ For a PC that only uses the controller, install `requirements.txt` instead of
 the development dependencies. The same file is reusable and executable:
 
 ```powershell
+.\.venv\Scripts\python.exe python\turntable_remote.py
 .\.venv\Scripts\python.exe python\turntable_remote.py status
 .\.venv\Scripts\python.exe python\turntable_remote.py --port COM4 toggle
 ```
+
+Running without a command automatically discovers and connects to the controller,
+then waits for Enter before sending one toggle. Explicit `toggle` also waits for
+Enter; type any text, press Ctrl+C, or close input to cancel. `status` is read-only
+and runs immediately.
 
 Add the `python/` directory to your recording application's import path, then:
 
@@ -59,7 +65,8 @@ with TurntableRemote() as remote:  # Optional explicit port="COM4".
     # Your recording code can continue even when the controller is unavailable.
 ```
 
-The class manages a persistent serial connection. If no compatible device is
+Creating `TurntableRemote()` automatically discovers and connects to a compatible
+device, keeping the serial connection open for subsequent calls. If no device is
 found, it warns once and `send()` quietly returns `UNAVAILABLE`. Other results
 are `SENT`, `FAILED` (explicit rejection), and `UNKNOWN` (uncertain outcome).
 There are no automatic toggle retries or reconnections. Call `connect()`

@@ -159,12 +159,16 @@ Avoid treating enum values as booleans; compare the result explicitly.
 From the project root, with runtime dependencies installed:
 
 ```powershell
+.\.venv\Scripts\python.exe python\turntable_remote.py
 .\.venv\Scripts\python.exe python\turntable_remote.py status
 .\.venv\Scripts\python.exe python\turntable_remote.py --port COM4 toggle
 ```
 
 Global options precede `status` or `toggle`: `--port PORT`, `--timeout SECONDS`.
-`status` prints JSON. `toggle` prints `sent`, `failed`, or `unknown` for an
+Omitting the command defaults to `toggle`. After connecting, `toggle` waits for
+Enter before sending one command; any text, Ctrl+C, or end-of-input cancels without
+transmitting. Cancellation exits with code 0. `status` prints JSON immediately
+without prompting. `toggle` prints `sent`, `failed`, or `unknown` for an
 attempted send. Warnings go to stderr. Exit codes: **0** success, **1** failed or
 uncertain outcome, **2** unavailable controller (also argparse usage errors).
 Each CLI invocation closes the port on exit. Only one process can own the serial

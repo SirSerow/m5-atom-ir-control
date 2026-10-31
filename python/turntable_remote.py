@@ -1,6 +1,7 @@
 """Persistent USB connection to an ATOM Lite turntable controller.
 
 Import TurntableRemote and SendResult from this file, or run it directly:
+    python turntable_remote.py  # Discover, connect, then wait for Enter to toggle.
     python turntable_remote.py --port COM4 status
     python turntable_remote.py --port COM4 toggle
 
@@ -252,7 +253,9 @@ def main(argv=None):
     parser.add_argument("--port", help="Explicit serial port; otherwise discover FTDI devices")
     parser.add_argument("--timeout", type=float, default=3.0,
                         help="Request deadline in seconds (default: 3)")
-    parser.add_argument("command", choices=("status", "toggle"))
+    parser.add_argument("command", nargs="?", default="toggle",
+                        choices=("status", "toggle"),
+                        help="Default: toggle, after waiting for Enter")
     args = parser.parse_args(argv)
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("--timeout must be finite and positive")
@@ -264,6 +267,13 @@ def main(argv=None):
             if reply is None:
                 return 1
             print(json.dumps(reply, indent=2))
+            return 0
+        try:
+            answer = input("Press Enter to send one toggle (any text cancels): ")
+        except (EOFError, KeyboardInterrupt):
+            answer = "cancel"
+        if answer:
+            print("Cancelled; no toggle sent.")
             return 0
         result = remote.send()
         print(result.value)

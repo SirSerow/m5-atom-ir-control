@@ -300,17 +300,52 @@ class RemoteTests(unittest.TestCase):
         self.assertFalse(self.factory.devices)
 
     def test_cli_status_and_toggle(self):
-        with contextlib.redirect_stdout(io.StringIO()) as output:
+        with patch("builtins.input", side_effect=AssertionError("status must not prompt")), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(module.main(["--port", "COM4", "status"]), 0)
         self.assertEqual(json.loads(output.getvalue())["firmware"], "atom-turntable-ir")
-        with contextlib.redirect_stdout(io.StringIO()) as output:
+
+        def press_enter(prompt):
+            self.assertTrue(self.factory.devices[-1].is_open)
+            self.assertEqual([r["cmd"] for r in self.factory.devices[-1].requests],
+                             ["status"])
+            self.assertFalse(self.factory.toggles)
+            return ""
+
+        with patch("builtins.input", side_effect=press_enter), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(module.main(["toggle"]), 0)
         self.assertEqual(output.getvalue().strip(), "sent")
         self.assertEqual(len(self.factory.toggles), 1)
 
+    def test_cli_no_arguments_discovers_and_waits_before_toggle(self):
+        def press_enter(prompt):
+            self.assertEqual([d.port for d in self.factory.devices], ["COM4"])
+            self.assertEqual([r["cmd"] for r in self.factory.devices[0].requests],
+                             ["status"])
+            return ""
+
+        with patch("builtins.input", side_effect=press_enter), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(module.main([]), 0)
+        self.assertEqual(len(self.factory.toggles), 1)
+        self.assertTrue(self.factory.devices[0].closed)
+
+    def test_cli_cancel_or_closed_input_never_sends(self):
+        for response in ("q", " ", EOFError(), KeyboardInterrupt()):
+            with self.subTest(response=response):
+                kwargs = ({"return_value": response} if isinstance(response, str)
+                          else {"side_effect": response})
+                with patch("builtins.input", **kwargs), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(module.main([]), 0)
+                self.assertFalse(self.factory.toggles)
+                self.assertTrue(self.factory.devices[-1].closed)
+
     def test_cli_unavailable_exit_code(self):
         self.ports.clear()
-        with self.assertLogs(module._LOGGER, level="WARNING"):
+        with patch("builtins.input", side_effect=AssertionError("unavailable must not prompt")), \
+                self.assertLogs(module._LOGGER, level="WARNING"):
             self.assertEqual(module.main(["toggle"]), 2)
 
     def test_cli_failure_and_unknown_exit_codes(self):
@@ -322,7 +357,8 @@ class RemoteTests(unittest.TestCase):
             def send(self): return self.result
             def status(self): return None
         instance = CliRemote()
-        with patch.object(module, "TurntableRemote", return_value=instance):
+        with patch.object(module, "TurntableRemote", return_value=instance), \
+                patch("builtins.input", return_value=""):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(module.main(["toggle"]), 1)
                 instance.result = SendResult.UNKNOWN
